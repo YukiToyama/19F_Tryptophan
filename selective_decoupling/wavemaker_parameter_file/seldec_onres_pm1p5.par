@@ -1,0 +1,10 @@
+## Wavemaker parameter file.
+
+seldec_onres_pm1p5:
+   cawurst_d(3.0 ppm, 8.0 ms, 0 ppm; H2L, Q=2.5, sucyc = p5, PA=0.5)
+   p90 = 13.7
+   pl =  -7.08 dB
+   ofs = 0 ppm
+   BF = 600.03
+   ss = 10 us
+

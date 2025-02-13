@@ -1,0 +1,320 @@
+; 19F_T1rho_ig_yt_600_cp
+; Avance version May 23, 2013
+
+/* 
+  Modified from 19F_CEST_ig_yt_600_cp by YT July 25h, 2024 
+  
+  19F R1rho relaxation
+  with 1H decoupling during acquisition
+  constant RF field with variable offsets and delays
+  F2: the number of offsets, F1: the number of delay
+  Recommend to use -Dalign2 and -Dconst for off-resonance R1rho experiments.
+  
+  Default setting uses 90-kai-90-180-zeta phase alignment (Hansen and Kay, JBNMR 2007 37:245)
+  Note this phase alignment scheme works best for +/- w1 (Hz) offset.
+  Use -Dalign2 for broad offsets
+  
+  -Dalign2 flg uses the improved version of the alignment scheme
+  as described in Fig.5 of Hansen and Kay, JBNMR 2007 37:245
+  set cnst4 (delta opt) to 1.0 - 1.6
+  cnst4 = 1.0 enables to align +/- 2*w1 (Hz) offset.
+  
+  Two 1H 180 pulses at T/4 and 3T/4 are applied to refocus cross-correlation.
+
+  -Dconst flg uses the constant time relaxation (magnetization decays with R1rho-R1 rate)
+  Ref: Akke and Palmer JACS 1996 118, 911-912
+  Otherwise the magnetization decays with R1rho so R1 rate needs to be measured separately.
+
+  Utilizing the anti-ringing triple pulse for excitation to relieve base-line distortion
+  caused by acoustic ringing.
+  Ref: Wang et al., JMR 2021 332 107067,  JBNMR 2020 74:753
+
+  Aug 9th, 2024 Make the program 3D to perform off-resonance R1rho experiment with f1 frequency list.
+  F2: number of offsets, F1: number of delay
+  
+  -Dconst flg was added.
+
+  Aug 10th, 2024 add -Dalign2 flg for better alignment by YT.     
+  
+*/
+
+#include <Avance.incl> 
+#include <Grad.incl>
+#include <Delay.incl>
+
+
+;Define phases
+#define zero ph=0.0
+#define one ph=90.0
+#define two ph=180.0
+#define three ph=270.0
+
+ "d11=30m"
+ "d12=20u"
+ "acqt0=-p1*2.0/PI"
+
+
+define pulse pwf_splk
+ "pwf_splk = p33"              /* spin lock pulse - must be >= 125 us */
+ "p2 = p1*2"
+ "p12 = p11*2"
+
+define list<delay> time_relax = <$VDLIST>
+ "l2=0" ; pointer to time_relax
+
+define list<frequency> F_offset = <$FQ1LIST>
+ "l3=0" ; pointer to F_offset
+
+define delay time_relax_max
+ "time_relax_max=d14"
+
+define delay dly_lk
+ "dly_lk = d17"
+
+/* BEGIN ACTUAL PULSE SEQUENCE */
+
+1 ze
+  d11 pl1:f1  pl12:f2
+
+ if "dly_lk > 41m" 
+   {
+   2u
+   print "error: ly_lk too lone < 40 ms"
+   goto HaltAcqu
+   }
+
+
+2 30m do:f2
+
+/* Update list pointers*/
+
+  "F_offset.idx=l3" 
+  "time_relax.idx=l2"
+
+/* heating element*/
+
+  if "time_relax > 500m"
+   {
+   2u
+   print "error: Fsat time time_T1 is too long"
+   goto HaltAcqu
+   } 
+
+   if "time_relax < time_relax_max"
+   {
+   "DELTA = time_relax_max - time_relax"
+   2u fq=cnst3(sfo hz):f1  ; move F carrier far off-resonance
+   (2u pl33):f1            ; set F power lower for SL
+   (DELTA cpds5 zero):f1   ; turn on F spin lock 
+   2u do:f1                ; turn off F spin lock
+   2u pl1:f1               ; set F power back for pwn
+   }
+   
+/* end of heating element */
+
+/* Purge element */
+   2u fq=0(sfo hz):f1      ; return carrier to the original position 
+   20u UNBLKGRAD           ; delay(20.0e-6) unblank gradients & lk_hold
+   2u pl13:f1
+   (2u cw zero):f1
+   dly_lk                  ; turn on cw decoupling for a delay of dly_lk
+   2u do:f1
+   (2u cw one):f1
+   "DELTA = dly_lk/2.0"
+   DELTA                   ; turn on cw decoupling for a delay of dly_lk
+   2u do:f1
+   p50:gp0*0.5             ; gradient 0 (50%)
+   d16
+   2u pl1:f1
+   (p1 zero):f1            ; F90x
+   2u                     
+   p50:gp0                 ; gradient 0
+   d16                  
+   (p1 one):f1             ; F90y
+   2u                     
+   p50:gp0*0.3             ; gradient 0 (30%)
+   d16                  
+   10u BLKGRAD             ; delay(10.0e-6) blank gradients
+
+/* Interscan delay */
+
+   d1  pl2:f2              ; delay(d1)
+
+/* This is the real start */
+   
+   4u fq=F_offset:f1       ;move the carrier for off-resonance spin-lock
+    
+  ; align magnetization
+
+#ifdef align2
+
+   (p1 zero):f1             ;F90(x)
+
+   "DELTA = pwf_splk/PI -p1*4.0/PI"
+   DELTA
+
+   (p1 two):f1              ;F90(-x)
+
+   "DELTA = 2*pwf_splk*cnst4/PI -p1*4.0/PI"
+   DELTA
+
+   (p1 zero):f1             ;F90(x)
+
+   "DELTA = pwf_splk/PI -p1*4.0/PI"
+   DELTA
+
+   (p1 zero):f1             ;F90(x)
+
+   "DELTA = pwf_splk*cnst4/PI -p1*4.0/PI"
+   DELTA
+
+   (p1 ph4 p2 ph4):f1       ;F90(-y/y)
+   
+#else
+
+   (p1 ph4):f1             ;F90(-y/y)
+
+   "DELTA = pwf_splk*2.0/PI - p1*4.0/PI"
+   DELTA                  
+
+   (p1 zero p2 ph4):f1   
+
+#endif
+
+   "DELTA = p1*2.0/PI - 2.0u"
+   DELTA
+
+   "DELTA = time_relax/4.0 - 0.5*p12"
+
+   if "DELTA < 0.2u"
+   {
+     2u
+     print "error: first time_relax point is too short"
+     goto HaltAcqu
+   }
+
+   (2u pl33):f1           ;set F power lower for SL
+   (DELTA cpds5 zero):f1  ;turn on F spin lock
+
+   (p12 zero):f2       
+ 
+   DELTA
+   DELTA
+
+   (p12 zero):f2   
+ 
+   DELTA 
+
+   2u do:f1               ;turn off F spin lock
+   2u pl1:f1              ;set F power back for hard pulse
+
+  ; realign magnetization
+  ; need symmetric element
+
+   "DELTA = p1*2/PI - 2u - 2u "
+   DELTA
+
+#ifdef align2
+
+   (p2 one p1 one):f1      
+
+   "DELTA = pwf_splk*cnst4/PI -p1*4.0/PI"
+   DELTA
+
+   (p1 zero):f1             ;F90(x)
+
+   "DELTA = pwf_splk/PI -p1*4.0/PI"
+   DELTA
+
+   (p1 zero):f1             ;F90(x)
+
+   "DELTA = 2*pwf_splk*cnst4/PI -p1*4.0/PI"
+   DELTA
+
+   (p1 two):f1            ;F90(-x)
+   "DELTA = pwf_splk/PI -p1*4.0/PI"
+   DELTA
+
+   (p1 zero):f1             ;F90(x)
+  
+#else
+
+   (p2 one p1 zero):f1 
+
+   "DELTA = pwf_splk*2.0/PI - p1*4.0/PI"
+   DELTA                   
+
+   (p1 one):f1            ;F90(y)
+
+#endif
+
+#ifdef const
+   2u
+   "DELTA = time_relax_max - time_relax - 2u"
+   DELTA
+#endif
+
+   10u UNBLKGRAD          ; delay(10.0e-6) unblank gradients & lk_hold
+   p51:gp1                ; gradient 1
+   d16 pl12:f2                 
+   10u BLKGRAD            ; delay(10.0e-6) blank gradients
+   2u fq=0(sfo hz):f1     ; return carrier to the original position 
+
+   (p1 ph1):f1            ;rgpulse(pw,zero,1.0e-6,0.0)
+   1u
+   (p1 ph2):f1            ;rgpulse(pw,zero,1.0e-6,0.0)
+   1u
+   (p1 ph3):f1            ;rgpulse(pw,zero,1.0e-6,0.0)
+
+  go=2 ph31  cpds2:f2
+  d11 do:f2 mc #0 to 2 F0(zd)
+  F2QF(calclc(l3, 1))
+  F1QF(calclc(l2, 1))
+
+HaltAcqu, 1m
+exit
+
+ph1=0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 1 3 1 3 1 3 1 3 1 3 1 3 1 3 1 3
+ph2=2 2 0 0 2 2 0 0 2 2 0 0 2 2 0 0 3 3 1 1 3 3 1 1 3 3 1 1 3 3 1 1
+ph3=0 0 0 0 2 2 2 2 0 0 0 0 2 2 2 2 1 1 1 1 3 3 3 3 1 1 1 1 3 3 3 3
+ph4=3 3 3 3 3 3 3 3 1 1 1 1 1 1 1 1
+ph26=0
+ph27=1
+
+ph31=0 2 2 0 2 0 0 2 2 0 0 2 0 2 2 0 1 3 3 1 3 1 1 3 3 1 1 3 1 3 3 1 
+
+
+
+
+;pl1 :  power level for 19F 90 deg hard pulse
+;pl2 :  power level for 1H 90 deg hard pulse
+;pl12 : power level for 1H decoupling during acquisition.
+;pl13 : power level for scrambling , typically about 23dB less power than high power
+;pl33 : power level for 19F spin lock
+;p1   : 90 deg pulse for 19F
+;p11  : 90 deg pulse for 1H 
+;p33  : 90 deg pulse for 19F spin lock [~250 us or stronger]
+;p50  : gradient pulse 50 [512 usec]
+;p51  : gradient pulse 51 [256 usec]
+;d11 : delay for disk i/o, 30ms
+;d14 : time_relax_max max spin lock duration 100~200ms
+;d16 : delay for homospoil/gradient recovery
+;d17 : delay for scrambling - set to 40 ms
+;cpd2: 1H decoupling sequence during acquisition
+;cpd5: 19F spin lock (use cwp)
+;cpdprg2: 1H decoupling sequence during acquisition
+;cpdprg5: 19F spin lock (use cwp)
+;pcpd2: f2 channel - 90 degree pulse for decoupling sequence (acquisition)
+;cnst3: set to far from o1 for heating compensation (~500000 Hz)
+;cnst4: factor deltaopt (1.0 - 1.6)
+;ns : 16*n
+;zgoptns : -Dconst, -Dalign2
+
+
+;for z-only gradients:
+;gpz0: 60%
+;gpz1: 80%
+
+;use gradient files:
+;gpnam0: SMSQ10.32
+;gpnam1: SMSQ10.32
