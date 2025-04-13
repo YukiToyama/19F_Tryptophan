@@ -1,0 +1,168 @@
+/* 1Hsat_zgesgp
+
+  Written by YT Apr 1, 2025
+  Modified from zgesgp 
+  
+  Check the 1H saturation level with different 1H dephaisng schemes.
+
+*/
+
+;avance-version (12/01/11)
+;1D sequence
+;water suppression using excitation sculpting with gradients
+;T.-L. Hwang & A.J. Shaka, J. Magn. Reson.,
+;   Series A 112 275-279 (1995)
+;
+;$CLASS=HighRes
+;$DIM=1D
+;$TYPE=
+;$SUBTYPE=
+;$COMMENT=
+
+
+prosol relations=<triple>
+
+
+#include <Avance.incl>
+#include <Grad.incl>
+#include <Delay.incl>
+
+
+"p2=p1*2"
+"d12=20u"
+
+
+"TAU=de+p1*2/3.1416+50u"
+
+
+"acqt0=0"
+baseopt_echo
+
+define delay dly_compdec
+  "dly_compdec = d18"
+
+;Define phases
+#define zero ph=0.0
+#define one ph=90.0
+#define two ph=180.0
+#define three ph=270.0
+
+
+
+1 ze
+2 30m
+  d12 pl1:f1 
+  d1
+
+  50u UNBLKGRAD
+
+#ifdef H_dephase
+ (2u pl1):f1              ; power pl1 for 1H hard pulse
+ (p1 zero):f1             ; 90 deg 1H hard pulse
+ 2u
+ p55:gp5                  ; gradient 5
+ d16
+#endif
+
+#ifdef H_inv
+ (2u pl1):f1              ; power pl1 for 1H hard pulse
+ (p2 zero):f1             ; 180 deg 1H hard pulse
+ 2u
+ p55:gp5                  ; gradient 5
+ d16
+#endif
+
+#ifdef H_compdec
+ 2u fq=cnst20 (bf ppm):f1
+ (2u pl14):f1             ; power(1H deocupling)
+ (2u cpds1 zero):f1       ; Turn ON 1H decoupling at power pl14
+ "DELTA = dly_compdec-8u"
+ DELTA
+ (2u do):f1               ; Turn OFF 1H decoupling   
+ p55:gp5                  ; gradient 5
+ d16
+ (2u pl1):f1              ; power pl1 for 1H hard pulse
+ 4u fq=0:f1
+
+#endif
+
+  p1 ph1
+  
+  50u 
+
+  
+  p16:gp1
+  d16 pl0:f1
+  (p12:sp1 ph2:r):f1
+  4u
+  d12 pl1:f1
+
+  p2 ph3
+  
+  4u
+ 
+  4u
+  p16:gp1
+  d16 
+  TAU
+  p16:gp2
+  d16 pl0:f1
+  (p12:sp1 ph4:r):f1
+  4u
+  d12 pl1:f1
+
+  p2 ph5
+
+  4u
+  p16:gp2
+  d16
+  
+  4u BLKGRAD
+  
+  go=2 ph31
+  30m mc #0 to 2 F0(zd)
+  4u 
+exit
+
+
+ph1=0
+ph2=0 1
+ph3=2 3
+ph4=0 0 1 1
+ph5=2 2 3 3
+ph31=0 2 2 0 
+
+
+;pl0 : 0W
+;pl1 : f1 channel - power level for pulse (default)
+;pl14 : power level for 1H decoupling for initial dephasing (-DH_compdec).
+;sp1 : f1 channel - shaped pulse 180 degree
+;p1 : f1 channel -  90 degree high power pulse
+;p2 : f1 channel - 180 degree high power pulse
+;p12: f1 channel - 180 degree shaped pulse (Squa100.1000)   [2 msec]
+;p16: homospoil/gradient pulse
+;d1 : relaxation delay; 1-5 * T1
+;d12: delay for power switching                             [20 usec]
+;d16: delay for homospoil/gradient recovery
+;d18 : delay for initial dephasing (-DH_compdec)
+;ns: 8 * n, total number of scans: NS * TD0
+;ds: 4
+;cnst20: 1H decoupling center [ppm]
+
+;zgoptns : -DH_dephase, -DH_inv, -DH_compdec
+
+
+;use gradient ratio:    gp 1 : gp 2
+;                         31 :   11
+
+;for z-only gradients:
+;gpz1: 31%
+;gpz2: 11%
+
+;use gradient files:
+;gpnam1: SMSQ10.100
+;gpnam2: SMSQ10.100
+
+
+
+;$Id: zgesgp,v 1.9 2012/01/31 17:49:32 ber Exp $

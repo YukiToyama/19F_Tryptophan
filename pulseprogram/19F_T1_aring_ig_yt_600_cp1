@@ -1,4 +1,4 @@
-/* 19F_T1_aring_yt_500_cp1
+/* 19FT1_aring_yt_500_cp1
 
   Written by YT Apr 25, 2022 
   Modified from 1HT1_water_lek_500_cp
@@ -34,6 +34,8 @@
   Modified by YT on Jan 19th, 2024 to add the option to 1H decoupling at the begining of the measurement
   to see the effect of the initial 1H magnetization.
 
+  Modified by YT on Apr 1st, 2025 to add the option to 1H inversion at the begining of the measurement
+  to see the effect of the initial 1H magnetization.
 */
 
 #include <Avance.incl>
@@ -54,6 +56,7 @@ define pulse pwf
 
 "in0=inf1/2"
 "d11=30m"
+"p22=p21*2"
 
 define delay dly_lk
   "dly_lk = d17"
@@ -105,7 +108,16 @@ define list<delay> time_relax = <$VDLIST>
   
 #ifdef H_dephase
  (2u pl2):f2            ; power pl2 for 1H hard pulse
- (p21 zero):f2             ; Turn OFF 1H decoupling 
+ (p21 zero):f2          ; 90 deg 1H pulse 
+ 2u
+ p55:gp5       ; gradient 5
+ d16
+ (2u pl12):f2            ; power pl12 for 1H decoupling during acquisition
+#endif
+
+#ifdef H_inv
+ (2u pl2):f2            ; power pl2 for 1H hard pulse
+ (p22 zero):f2          ; 180 deg 1H pulse
  2u
  p55:gp5       ; gradient 5
  d16
@@ -127,6 +139,7 @@ define list<delay> time_relax = <$VDLIST>
 
 #ifndef H_compdec
 #ifndef H_dephase
+#ifndef H_inv
 
  2u pl11:f1
  (2u cw zero):f1
@@ -142,6 +155,7 @@ define list<delay> time_relax = <$VDLIST>
  2u
  p55:gp5*0.5       ; gradient 5 * 0.5
  d16
+#endif
 #endif
 #endif
 
@@ -203,8 +217,8 @@ ph29=3
 ;d16 : gradient recovery delay, 200us
 ;d17 : delay for scrambling - set to 40 ms
 ;d18 : delay for initial dephasing (-DH_compdec).
-;cpdprg1: decoupling according to sequence defined by cpdprg1 (decoupling during Trelax)
-;cpdprg2: decoupling according to sequence defined by cpdprg2 (decoupling during acquisition)
+;cpdprg1: decoupling according to sequence defined by cpdprg1 (decoupling during Trelx)
+;cpdprg2: decoupling according to sequence defined by cpdprg2  (decoupling during acquisition)
 ;cpdprg3: decoupling according to sequence defined by cpdprg3 (for initial decoupling)
 ;pcpd2: f2 channel - 90 degree pulse for decoupling sequence
 ;pl1 : power level for 19F 90 pulse
@@ -216,5 +230,6 @@ ph29=3
 ;cnst12 : power in 
 ;p1 : 19F pulse, 90 deg
 ;p21 : 1H pulse, 90 deg
+;p22 : 1H pulse, 180 deg
 
-;zgoptns : -DH_dec -DH_dephase, -DH_compdec
+;zgoptns : -DH_dec, -DH_dephase,-DH_inv, -DH_compdec
