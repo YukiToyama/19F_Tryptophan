@@ -165,11 +165,12 @@ def recovery(time, R1, M0):
 popt, pcov = curve_fit(recovery, time, Imag, p0=[1, 0.05]) 
 R1I, I0  = popt
 
-popt, pcov = curve_fit(recovery, time, Smag, p0=[1, 0.05]) 
-R1S, S0  = popt
-
-popt, pcov = curve_fit(recovery, time, Kmag, p0=[1, 0.05]) 
-R1K, K0  = popt
+if dec == True:
+    popt, pcov = curve_fit(recovery, time, Smag, p0=[1, 0.05]) 
+    R1S, S0  = popt
+    
+    popt, pcov = curve_fit(recovery, time, Kmag, p0=[1, 0.05]) 
+    R1K, K0  = popt
 
 ##################
 # Plot
